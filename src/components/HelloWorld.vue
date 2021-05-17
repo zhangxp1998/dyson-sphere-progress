@@ -1,9 +1,11 @@
 <template>
   <div class="hello">
     <canvas ref="canvas" width="800" height="600"></canvas>
-    <p>x: {{ cameraPosition.x }}</p>
-    <p>y: {{ cameraPosition.y }}</p>
-    <p>z: {{ cameraPosition.z }}</p>
+    <div>
+      <span style="padding: 10px"> x: {{ x }} y: {{ y }} z: {{ z }} </span>
+      <label style="padding: 10px" for="text">Text</label>
+      <input id="text" type="text" />
+    </div>
   </div>
 </template>
 
@@ -11,25 +13,21 @@
 import { defineComponent } from "vue";
 import * as THREE from "three";
 import { DysonNode, DysonShell, DysonSphere } from "../DysonSphereModel";
-import dysonSphere from "../large_sphere";
 import earth from "@/assets/earthmap1k.jpg";
 import earthBump from "@/assets/earthbump1k.jpg";
 import earthSpecular from "@/assets/earth-specular.png";
-
-import OrbitControls from "../OrbitControls";
+import { OrbitControls } from "../OrbitControls";
+import { RescaleLayer } from "../utils/DysonSphereUtils";
 
 function geometryForShell(
   shell: DysonShell,
   nodeMap: Map<number, DysonNode>,
-  sphereRadius: number,
   scene: THREE.Scene
 ) {
   let geometry = new THREE.BufferGeometry();
-  let nodes = shell.nodeIds.$content!.map((id) => nodeMap.get(id));
+  let nodes = shell.nodeIds.map((id) => nodeMap.get(id));
 
-  let pts = nodes.map((n) =>
-    new THREE.Vector3(n!.pos.x, n!.pos.y, n!.pos.z).divideScalar(sphereRadius)
-  );
+  let pts = nodes.map((n) => new THREE.Vector3(n!.pos.x, n!.pos.y, n!.pos.z));
   let triangles = [];
   let origin = pts[0];
   for (let i = 2; i < pts.length; i++) {
@@ -55,43 +53,39 @@ function geometryForShell(
 }
 
 function loadSphere(scene: THREE.Scene, dysonSphere: DysonSphere) {
-  const sphereRadius = dysonSphere.maxOrbitRadius;
-  dysonSphere.layers.$content?.forEach((layer) => {
+  dysonSphere.layers.forEach((layer) => {
     let idMap = new Map<number, DysonNode>();
-    layer.nodes.$content?.forEach((node) => {
+    layer.nodes.forEach((node) => {
       idMap.set(node.id, node);
     });
+    console.log(`Nodes: ${layer.nodes.length}`);
     const material = new THREE.LineBasicMaterial({
       color: 0x0000ff,
     });
-    layer.shells?.$content?.forEach((shell) => {
-      let nodes: DysonNode[] = shell.nodeIds?.$content?.map((idx) =>
+    layer.shells?.forEach((shell) => {
+      let nodes: DysonNode[] = shell.nodeIds?.map((idx) =>
         idMap.get(idx)
       ) as DysonNode[];
-      const points = nodes.map((n) =>
-        new THREE.Vector3(n.pos.x, n.pos.y, n.pos.z).divideScalar(sphereRadius)
+      const points = nodes.map(
+        (n) => new THREE.Vector3(n.pos.x, n.pos.y, n.pos.z)
       );
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setFromPoints(points);
       const line = new THREE.Line(geometry, material);
       line.type = "LineLoop";
       scene.add(line);
-      geometryForShell(shell, idMap, sphereRadius, scene);
+      geometryForShell(shell, idMap, scene);
     });
-    console.log(layer.shells.$content?.length);
   });
   let loader = new THREE.TextureLoader();
   let texture = loader.load(earth);
   let bumpMap = loader.load(earthBump);
   const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(
-      (dysonSphere.minOrbitRadius * 0.7) / sphereRadius,
-      32,
-      32
-    ),
+    new THREE.SphereGeometry(dysonSphere.minOrbitRadius * 0.7, 32, 32),
     new THREE.MeshPhongMaterial({
       map: texture,
       bumpMap: bumpMap,
-      bumpScale: 0.05,
+      bumpScale: 0.5,
       specularMap: loader.load(earthSpecular),
       specular: new THREE.Color("grey"),
       side: THREE.DoubleSide,
@@ -119,21 +113,60 @@ function resizeRendererToDisplaySize(renderer: THREE.Renderer) {
 }
 
 export default defineComponent({
-  name: "HelloWorld",
+  name: "DysonSphere",
   data: function () {
-    return { cameraPosition: new THREE.Vector3() };
+    return {
+      cameraPosition: new THREE.Vector3(),
+      font: {} as THREE.Font,
+      loader: new THREE.FontLoader(),
+      dysonSphere: {} as DysonSphere,
+      displayText: "",
+      displayTextMesh: {} as THREE.Mesh,
+      scene: {} as THREE.Scene,
+    };
   },
-  mounted: function () {
+  props: {
+    dyson: String,
+  },
+  methods: {
+    geometryForText(text: string) {
+      const textDistance = this.maxLayerRadius + 1000;
+      console.log(this.maxLayerRadius);
+
+      let geometry = new THREE.TextGeometry(text, {
+        font: this.font,
+        size: textDistance / 3,
+        height: 0.02,
+      });
+      return geometry;
+    },
+    addText: function (text: string, scene: THREE.Scene) {
+      const textDistance = this.maxLayerRadius + 1000;
+      let geometry = this.geometryForText(text);
+      let mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshBasicMaterial({ color: "pink" })
+      );
+      mesh.position.x = -textDistance * 0.5;
+      mesh.position.z = textDistance;
+      scene.add(mesh);
+      this.displayTextMesh = mesh;
+    },
+  },
+  mounted: async function () {
     const canvas: HTMLCanvasElement = this.$refs["canvas"] as HTMLCanvasElement;
     console.log(canvas);
+    const JetbrainMono = await import("@/assets/JetBrains_Mono_NL_Regular");
+    this.font = this.loader.parse(JetbrainMono);
+    const znear = 0.1;
+    const zfar = 200000;
     const camera = new THREE.PerspectiveCamera(
       75,
       canvas.width / canvas.height,
-      0.1,
-      2000
+      znear,
+      zfar
     );
-    camera.position.set(0, 0, 1);
-    camera.lookAt(0, 0, 0);
+
     const renderer = new THREE.WebGLRenderer({ canvas });
     renderer.setClearColor(new THREE.Color(0xaaaaaa));
 
@@ -141,10 +174,29 @@ export default defineComponent({
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.zoomSpeed = 0.5;
-    controls.minDistance = 0.2;
+    controls.minDistance = znear * 2;
+    controls.maxDistance = zfar;
+    ((controls as any) as THREE.EventDispatcher).addEventListener(
+      "change",
+      (o) => {
+        this.$data.cameraPosition.x = camera.position.x;
+        this.$data.cameraPosition.y = camera.position.y;
+        this.$data.cameraPosition.z = camera.position.z;
+      }
+    );
     const scene = new THREE.Scene();
+    this.scene = scene;
 
-    loadSphere(scene, dysonSphere);
+    this.dysonSphere = await import("@/assets/large_sphere.json");
+    this.dysonSphere.layers.forEach((l) =>
+      RescaleLayer(l, this.dysonSphere.minOrbitRadius)
+    );
+
+    loadSphere(scene, this.dysonSphere);
+    this.addText("Eve", scene);
+
+    camera.position.set(0, 0, this.dysonSphere.maxOrbitRadius);
+    camera.lookAt(0, 0, 0);
 
     const render = (time: number) => {
       if (resizeRendererToDisplaySize(renderer)) {
@@ -157,12 +209,30 @@ export default defineComponent({
       controls.update();
 
       requestAnimationFrame(render);
-      this.$data.cameraPosition.x = camera.position.x;
-      this.$data.cameraPosition.y = camera.position.y;
-      this.$data.cameraPosition.z = camera.position.z;
     };
 
     requestAnimationFrame(render);
+  },
+  computed: {
+    maxLayerRadius(): number {
+      return Math.max(...this.dysonSphere.layers.map((l) => l.orbitRadius));
+    },
+    x(): string {
+      return this.cameraPosition.x.toFixed(4);
+    },
+    y(): string {
+      return this.cameraPosition.y.toFixed(4);
+    },
+    z(): string {
+      return this.cameraPosition.z.toFixed(4);
+    },
+  },
+  watch: {
+    displayText: function (newText, oldTextt) {
+      // const geometry = this.geometryForText(newText);
+      // this.displayTextMesh.geometry.dispose();
+      // this.displayTextMesh.geometry = geometry;
+    },
   },
 });
 </script>

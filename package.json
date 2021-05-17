@@ -8,6 +8,10 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "lodash": "^4.17.21",
+    "three": "^0.128.0",
+    "three-orbitcontrols-ts": "^0.1.2",
+    "tslib": "^2.2.0",
     "vue": "^3.0.0"
   },
   "devDependencies": {

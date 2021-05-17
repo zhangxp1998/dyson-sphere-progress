@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2016",
     "module": "esnext",
     "strict": true,
     "jsx": "preserve",
@@ -13,7 +13,8 @@
     "baseUrl": ".",
     "types": ["webpack-env"],
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "tslib": ["node_modules/tslib/tslib.d.ts"]
     },
     "lib": ["esnext", "dom", "dom.iterable", "scripthost"]
   },
