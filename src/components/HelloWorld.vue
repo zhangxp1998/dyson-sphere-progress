@@ -4,7 +4,7 @@
     <div>
       <span style="padding: 10px"> x: {{ x }} y: {{ y }} z: {{ z }} </span>
       <label style="padding: 10px" for="text">Text</label>
-      <input id="text" type="text" />
+      <input id="text" type="text" v-model="displayText" />
     </div>
   </div>
 </template>
@@ -229,9 +229,14 @@ export default defineComponent({
   },
   watch: {
     displayText: function (newText, oldTextt) {
-      // const geometry = this.geometryForText(newText);
-      // this.displayTextMesh.geometry.dispose();
-      // this.displayTextMesh.geometry = geometry;
+      console.log({ newText });
+      const geometry = this.geometryForText(newText);
+      this.displayTextMesh.geometry.dispose();
+      this.displayTextMesh.geometry = geometry;
+      geometry.computeBoundingBox();
+      const boundingBox = geometry.boundingBox!;
+      const textWidth = boundingBox.max.x - boundingBox.min.x;
+      this.displayTextMesh.position.x = -textWidth * 0.5;
     },
   },
 });
