@@ -133,7 +133,15 @@ export default defineComponent({
   },
   methods: {
     outputToJson() {
-      this.outputJson = JSON.stringify(MeshToLayer(this.displayTextMesh));
+      const dysonSphere: DysonSphere = JSON.parse(
+        JSON.stringify(this.dysonSphere)
+      );
+      const layer = MeshToLayer(this.displayTextMesh);
+      layer.orbitRadius = this.maxLayerRadius + 1000;
+      layer.orbitAngularSpeed = 1.142905;
+      layer.id = Math.max(...dysonSphere.layers.map((l) => l.id)) + 1;
+      dysonSphere.layers.push(layer);
+      this.outputJson = JSON.stringify(dysonSphere);
     },
     geometryForText(text: string) {
       const textDistance = this.maxLayerRadius + 1000;
