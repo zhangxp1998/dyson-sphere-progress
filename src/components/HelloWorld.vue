@@ -5,7 +5,9 @@
       <span style="padding: 10px"> x: {{ x }} y: {{ y }} z: {{ z }} </span>
       <label style="padding: 10px" for="text">Text</label>
       <input id="text" type="text" v-model="displayText" />
+      <button v-on:click="outputToJson()">Output</button>
     </div>
+    <textarea v-bind:value="outputJson"></textarea>
   </div>
 </template>
 
@@ -17,7 +19,7 @@ import earth from "@/assets/earthmap1k.jpg";
 import earthBump from "@/assets/earthbump1k.jpg";
 import earthSpecular from "@/assets/earth-specular.png";
 import { OrbitControls } from "../OrbitControls";
-import { RescaleLayer } from "../utils/DysonSphereUtils";
+import { RescaleLayer, MeshToLayer } from "../utils/DysonSphereUtils";
 
 function geometryForShell(
   shell: DysonShell,
@@ -123,12 +125,16 @@ export default defineComponent({
       displayText: "",
       displayTextMesh: {} as THREE.Mesh,
       scene: {} as THREE.Scene,
+      outputJson: "",
     };
   },
   props: {
     dyson: String,
   },
   methods: {
+    outputToJson() {
+      this.outputJson = JSON.stringify(MeshToLayer(this.displayTextMesh));
+    },
     geometryForText(text: string) {
       const textDistance = this.maxLayerRadius + 1000;
       console.log(this.maxLayerRadius);
